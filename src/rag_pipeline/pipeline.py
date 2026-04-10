@@ -8,19 +8,20 @@ Flow:
   2. The retriever fetches the most relevant document chunks.
   3. The LLM generates an answer grounded in those chunks.
 
-Uses LangChain's LCEL (LangChain Expression Language) for
-a clean, composable chain definition.
+Uses a strict system prompt that forces the model to answer
+ONLY from the provided context and cite sources. This
+significantly reduces hallucinations.
 ----------------------------------------------------------
 """
 
 from __future__ import annotations
 
 import logging
+from operator import itemgetter
 from typing import Optional
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
 from langchain_groq import ChatGroq
 
 from config import settings
@@ -29,27 +30,44 @@ from src.vector_store import ChromaVectorStore
 logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------
-# System prompt template for the RAG chain
+# Strict system prompt — anti-hallucination design
 # -------------------------------------------------------------------
-RAG_PROMPT_TEMPLATE = """\
-You are an expert software engineer assistant. Use the following pieces of
-context retrieved from a GitHub repository to answer the user's question.
+SYSTEM_PROMPT = """\
+You are a precise GitHub repository analysis assistant. You answer questions \
+about software repositories using ONLY the context provided below.
 
-If you don't know the answer based on the context, say so honestly — do NOT
-fabricate information.
+## STRICT RULES — YOU MUST FOLLOW ALL OF THEM:
 
-Context:
+1. **ONLY use information from the provided context.** Do NOT use prior \
+knowledge, training data, or general assumptions.
+2. **If the context does not contain enough information to answer the \
+question, you MUST say:** "I don't have enough information in the \
+repository context to answer this question."
+3. **Never fabricate** file names, function names, class names, URLs, \
+statistics, or any other details not explicitly present in the context.
+4. **Cite your sources.** When referencing code or files, mention the \
+file path (e.g., `src/main.py`) if available in the metadata.
+5. **Be precise about uncertainty.** If something is partially covered \
+in the context, say what you know and explicitly state what is missing.
+6. **Use the repository metadata** (stars, forks, language, contributors) \
+when answering questions about the repository itself.
+
+## CONTEXT FROM REPOSITORY:
+
 {context}
-
-Question: {question}
-
-Provide a clear, concise, and technically accurate answer:
 """
+
+HUMAN_PROMPT = "{question}"
 
 
 class RAGPipeline:
     """
     Orchestrates retrieval + generation for repository Q&A.
+
+    Features:
+      - Strict anti-hallucination system prompt
+      - Source citations from document metadata
+      - Repository metadata injected into context
     """
 
     def __init__(
@@ -89,10 +107,12 @@ class RAGPipeline:
 
     def _build_chain(self):
         """Construct the LCEL retrieval-augmented generation chain."""
-        from operator import itemgetter
+        retriever = self._vector_store.as_retriever(search_kwargs={"k": 8})
 
-        retriever = self._vector_store.as_retriever()
-        prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT),
+            ("human", HUMAN_PROMPT),
+        ])
 
         # Chain: retrieve context → format prompt → LLM → parse string
         chain = (
@@ -108,5 +128,34 @@ class RAGPipeline:
 
     @staticmethod
     def _format_docs(docs) -> str:
-        """Combine retrieved documents into a single context string."""
-        return "\n\n---\n\n".join(doc.page_content for doc in docs)
+        """
+        Format retrieved documents with their metadata for context.
+
+        Each chunk is prefixed with its source type and file path
+        so the LLM can cite specific files in its answer.
+        """
+        formatted_parts: list[str] = []
+
+        for doc in docs:
+            meta = doc.metadata
+            source_type = meta.get("source_type", "unknown")
+            file_path = meta.get("file_path", "")
+            repo_name = meta.get("repo_name", "")
+
+            # Build a header line for this chunk
+            if source_type == "source_code" and file_path:
+                header = f"[SOURCE CODE — {file_path}]"
+            elif source_type == "readme":
+                header = f"[README — {repo_name}]"
+            elif source_type == "documentation":
+                header = f"[DOCUMENTATION — {repo_name}]"
+            elif source_type == "metadata":
+                header = f"[REPOSITORY METADATA — {repo_name}]"
+            elif source_type == "directory_tree":
+                header = f"[DIRECTORY STRUCTURE — {repo_name}]"
+            else:
+                header = f"[{source_type.upper()} — {repo_name}]"
+
+            formatted_parts.append(f"{header}\n{doc.page_content}")
+
+        return "\n\n---\n\n".join(formatted_parts)
