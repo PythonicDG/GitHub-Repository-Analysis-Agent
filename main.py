@@ -81,8 +81,27 @@ def ingest(repo_name: str | None = None, topic: str | None = None) -> None:
 
     console.print(f"[green]✓ Loaded {len(contents)} repository(ies)[/]")
 
-    # Step 2 — Process
-    console.print("[bold cyan]📝 Processing documents…[/]")
+    # Display metadata summary for each loaded repo
+    for content in contents:
+        meta = content.metadata
+        console.print(
+            Panel(
+                f"[bold]{content.repo_name}[/]\n"
+                f"[dim]{meta.description}[/]\n\n"
+                f"⭐ Stars: [yellow]{meta.stars:,}[/]  |  "
+                f"🍴 Forks: [cyan]{meta.forks:,}[/]  |  "
+                f"🐛 Issues: [red]{meta.open_issues:,}[/]\n"
+                f"💻 Language: [green]{meta.language}[/]  |  "
+                f"📄 License: {meta.license_name}\n"
+                f"👥 Contributors: {', '.join(meta.contributors[:5]) or 'N/A'}\n"
+                f"📁 Files in tree: {len(content.directory_tree.splitlines())} entries",
+                title="📊 Repository Info",
+                border_style="bright_cyan",
+            )
+        )
+
+    # Step 2 — Process (code-aware chunking)
+    console.print("[bold cyan]📝 Processing documents (code-aware chunking)…[/]")
     processor = DocumentProcessor()
     documents = processor.process_many(contents)
     console.print(f"[green]✓ Created {len(documents)} document chunks[/]")
