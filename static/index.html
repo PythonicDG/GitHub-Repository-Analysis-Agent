@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI GitHub Analyzer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/your-font-awesome-kit.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fab fa-github"></i>
+                <span>GitAnalyzer<span class="ai-tag">AI</span></span>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-view="chat-view">
+                    <i class="fas fa-comment-dots"></i> <span>Chat</span>
+                </button>
+                <button class="nav-item" data-view="add-repo-view">
+                    <i class="fas fa-plus-circle"></i> <span>Add Repo</span>
+                </button>
+                <button class="nav-item" data-view="search-topic-view">
+                    <i class="fas fa-search"></i> <span>Search Topic</span>
+                </button>
+            </nav>
+
+            <div class="repo-history">
+                <h3>Current Context</h3>
+                <div id="active-repo-card" class="empty-context">
+                    No repository loaded
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button id="new-chat-btn" class="footer-btn">
+                    <i class="fas fa-rotate-left"></i> <span>New Session</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="view-title">
+                    <h2 id="current-view-title">Chat Analysis</h2>
+                </div>
+                <div class="repo-stats" id="top-repo-stats" style="display: none;">
+                    <span class="stat"><i class="fas fa-star"></i> <span id="stat-stars">0</span></span>
+                    <span class="stat"><i class="fas fa-code-branch"></i> <span id="stat-forks">0</span></span>
+                    <span class="language-pill" id="stat-lang">Python</span>
+                </div>
+            </header>
+
+            <!-- Views Container -->
+            <div class="view-container">
+                
+                <!-- Chat View -->
+                <div id="chat-view" class="view active">
+                    <div id="chat-messages" class="messages-container">
+                        <div class="message system">
+                            <div class="msg-content">
+                                Hello! Please load a repository using the sidebar to start the analysis.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="input-area">
+                        <div class="input-wrapper">
+                            <textarea id="chat-input" placeholder="Ask anything about the code..." rows="1"></textarea>
+                            <button id="send-btn" disabled>
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Repo View -->
+                <div id="add-repo-view" class="view">
+                    <div class="form-card">
+                        <h2>Load Repository</h2>
+                        <p>Analyze any public GitHub repository by its full name.</p>
+                        <div class="input-group">
+                            <label for="repo-name-input">Repository Name</label>
+                            <input type="text" id="repo-name-input" placeholder="e.g. langchain-ai/langchain">
+                        </div>
+                        <button id="load-repo-btn" class="primary-btn">
+                            <i class="fas fa-cloud-download-alt"></i> Ingest Repository
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Topic View -->
+                <div id="search-topic-view" class="view">
+                    <div class="form-card">
+                        <h2>Search by Topic</h2>
+                        <p>Find and analyze trending repositories for a specific topic.</p>
+                        <div class="input-group">
+                            <label for="topic-input">Topic</label>
+                            <input type="text" id="topic-input" placeholder="e.g. machine learning, fastapi, rust">
+                        </div>
+                        <button id="search-topic-btn" class="primary-btn">
+                            <i class="fas fa-magnifying-glass"></i> Search & Analyze
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="overlay">
+        <div class="loader-content">
+            <div class="spinner"></div>
+            <p id="loading-text">Processing repository content...</p>
+            <span class="sub-text">This may take a minute for large repos</span>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
