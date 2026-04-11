@@ -23,6 +23,7 @@ from typing import Optional
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from config import settings
 from src.vector_store import ChromaVectorStore
@@ -78,12 +79,31 @@ class RAGPipeline:
         self._vector_store = vector_store or ChromaVectorStore()
         self._llm_model = llm_model or settings.llm_model
 
-        # Build LLM using Groq (free, fast inference)
-        self._llm = ChatGroq(
-            model=self._llm_model,
-            temperature=0,
-            groq_api_key=settings.groq_api_key,
-        )
+        # Select LLM Provider
+        provider = settings.llm_provider.lower()
+        
+        if provider == "groq":
+            logger.info(f"Using Groq LLM: {self._llm_model}")
+            self._llm = ChatGroq(
+                model=self._llm_model,
+                temperature=0,
+                groq_api_key=settings.groq_api_key,
+            )
+        elif provider == "google":
+            # If the user forgot to change the model when switching to google,
+            # we'll default to gemini to avoid validation errors.
+            if "llama" in self._llm_model.lower():
+                logger.warning(f"Provider 'google' detected with Llama model '{self._llm_model}'. Defaulting to 'gemini-2.0-flash'.")
+                self._llm_model = "gemini-2.0-flash"
+
+            logger.info(f"Using Google Gemini LLM: {self._llm_model}")
+            self._llm = ChatGoogleGenerativeAI(
+                model=self._llm_model,
+                temperature=0,
+                google_api_key=settings.google_api_key,
+            )
+        else:
+            raise ValueError(f"Unsupported LLM provider: {provider}")
 
         # Build RAG chain using LCEL
         self._chain = self._build_chain()

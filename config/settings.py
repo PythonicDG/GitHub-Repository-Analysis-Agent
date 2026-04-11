@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # --- Groq ---
     groq_api_key: str = ""
 
+    # --- Gemini ---
+    google_api_key: str = ""
+
     # --- ChromaDB ---
     chroma_persist_dir: str = "./data/chroma_db"
 
@@ -31,7 +34,10 @@ class Settings(BaseSettings):
     embedding_model: str = "all-MiniLM-L6-v2"
 
     # --- LLM ---
-    llm_model: str = "llama-3.3-70b-versatile"
+    llm_provider: str = "google"  # "groq" or "google"
+    llm_model: str = "gemini-2.0-flash" 
+    # For Groq: llama-3.3-70b-versatile
+    # For Gemini: gemini-2.0-flash, gemini-1.5-pro
 
     # --- Document Processing ---
     chunk_size: int = 1000
