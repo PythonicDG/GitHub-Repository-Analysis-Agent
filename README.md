@@ -1,6 +1,8 @@
 # 🤖 GitAnalyzer AI — Simplified
 
-A lean, efficient GitHub repository analysis agent that focuses on provide core insights with minimal complexity and token usage.
+An intelligent agent that fetches GitHub repositories, processes their content, and lets you ask questions about them using a hybrid rule-based and LLM approach.
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/import?repo=https://github.com/PythonicDG/GitHub-Repository-Analysis-Agent)
 
 ---
 
