@@ -127,7 +127,7 @@ class RAGPipeline:
 
     def _build_chain(self):
         """Construct the LCEL retrieval-augmented generation chain."""
-        retriever = self._vector_store.as_retriever(search_kwargs={"k": 8})
+        retriever = self._vector_store.as_retriever(search_kwargs={"k": 5})
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),

@@ -34,8 +34,8 @@ class Settings(BaseSettings):
     embedding_model: str = "all-MiniLM-L6-v2"
 
     # --- LLM ---
-    llm_provider: str = "google"  # "groq" or "google"
-    llm_model: str = "gemini-2.0-flash" 
+    llm_provider: str = "groq"  # "groq" or "google"
+    llm_model: str = "llama-3.1-8b-instant" 
     # For Groq: llama-3.3-70b-versatile
     # For Gemini: gemini-2.0-flash, gemini-1.5-pro
 
