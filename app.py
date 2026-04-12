@@ -1,45 +1,39 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+import logging
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import Optional, List
-import os
-import logging
+from typing import Optional
 
-from src.github_loader import GitHubRepoLoader
-from src.document_processor import DocumentProcessor
-from src.rag_pipeline import RAGPipeline
-from src.vector_store import ChromaVectorStore
-from utils import setup_logging
+# Import our simplified modules
+from config import settings
+import github_fetcher
+import chat
+
+# Configure logging
+logging.basicConfig(
+    level=settings.log_level,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI
-app = FastAPI(title="GitHub Analysis Agent API")
-
-# Setup logging
-setup_logging()
-logger = logging.getLogger(__name__)
+app = FastAPI(title="Simplified GitHub Analysis Agent")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Models
 class IngestRequest(BaseModel):
-    repo_name: Optional[str] = None
-    topic: Optional[str] = None
+    repo_url: str
 
 class ChatRequest(BaseModel):
     question: str
 
-class RepoMetadata(BaseModel):
-    name: str
-    description: Optional[str]
-    stars: int
-    forks: int
-    language: Optional[str]
-
-# Global state (for simplicity in this demo)
-# In a real app, you might track per-session vector stores or multiple repos
-current_repo_meta = None
+# Global state for current repo data
+# In a real app, use a session-based cache or database
+current_repo_data = None
 
 @app.get("/")
 async def read_index():
@@ -47,57 +41,36 @@ async def read_index():
 
 @app.post("/ingest")
 async def ingest_repo(request: IngestRequest):
-    global current_repo_meta
+    global current_repo_data
     try:
-        loader = GitHubRepoLoader()
-        if request.repo_name:
-            content = loader.load_repo(request.repo_name)
-            contents = [content]
-        elif request.topic:
-            contents = loader.search_repos(request.topic, max_results=1) # Just one for speed in UI
-            if not contents:
-                raise HTTPException(status_code=404, detail="No repositories found for this topic")
-        else:
-            raise HTTPException(status_code=400, detail="Provide repo_name or topic")
-
-        # Process and Store
-        processor = DocumentProcessor()
-        documents = processor.process_many(contents)
-        
-        store = ChromaVectorStore()
-        store.add_documents(documents)
-
-        # Save metadata for UI
-        repo = contents[0]
-        current_repo_meta = {
-            "name": repo.repo_name,
-            "description": repo.metadata.description,
-            "stars": repo.metadata.stars,
-            "forks": repo.metadata.forks,
-            "language": repo.metadata.language,
-            "contributors": repo.metadata.contributors[:5],
-            "tree_entries": len(repo.directory_tree.splitlines())
-        }
-
-        return {"status": "success", "repo_metadata": current_repo_meta}
-
+        # Use our simplified fetcher
+        current_repo_data = github_fetcher.fetch_repo(request.repo_url)
+        return {"status": "success", "repo_metadata": current_repo_data["metadata"], "repo_name": current_repo_data["name"]}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.error(f"Ingestion error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to process repository")
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+async def chat_endpoint(request: ChatRequest):
+    global current_repo_data
+    if not current_repo_data:
+        raise HTTPException(status_code=400, detail="Please ingest a repository first")
+    
     try:
-        pipeline = RAGPipeline()
-        answer = pipeline.ask(request.question)
-        return {"answer": answer}
+        # Use our simplified chat logic
+        result = chat.chat(request.question, current_repo_data)
+        return result
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to generate answer")
 
 @app.get("/status")
 async def get_status():
-    return {"current_repo": current_repo_meta}
+    if current_repo_data:
+        return {"current_repo": current_repo_data["name"], "metadata": current_repo_data["metadata"]}
+    return {"current_repo": None}
 
 if __name__ == "__main__":
     import uvicorn
