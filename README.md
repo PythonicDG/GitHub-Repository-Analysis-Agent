@@ -1,89 +1,60 @@
-# 🤖 AI-Powered GitHub Repository Analysis Agent
+# 🤖 GitAnalyzer AI — Simplified
 
-An intelligent agent that fetches GitHub repositories, processes their content
-(README, documentation, source code), and lets you ask questions about them
-using **Retrieval-Augmented Generation (RAG)**.
+A lean, efficient GitHub repository analysis agent that focuses on provide core insights with minimal complexity and token usage.
 
 ---
 
 ## ✨ Features
 
-- **GitHub Integration** — Fetch repos by name or discover by topic
-- **Smart Document Processing** — Chunks README, docs, and source code
-- **Vector Storage** — Persists embeddings in ChromaDB for fast retrieval
-- **RAG-Powered Q&A** — Ask natural-language questions about any repository
-- **Agent Workflow** — Extensible LangGraph pipeline for orchestration
+- **Direct Repo Analysis** — Input any GitHub URL or `owner/repo` to start.
+- **Efficient Extraction** — Fetches metadata, file tree, and key project files (package.json, Dockerfile, etc.).
+- **Hybrid Chat Logic** — Instantly answers factual questions (stars, structure) via rule-based logic to save tokens.
+- **LLM-Powered Insights** — Uses Groq (Llama-3.1-8b) with selective context for complex reasoning.
+- **Zero-DB Architecture** — No vector store or embeddings required; uses simple JSON caching for speed.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-├── main.py                         # Entry point — CLI + interactive Q&A
-├── requirements.txt                # Python dependencies
-├── .env.example                    # Environment variable template
-│
-├── config/
-│   ├── __init__.py
-│   └── settings.py                 # Pydantic-settings configuration
-│
-├── src/
-│   ├── github_loader/
-│   │   └── loader.py               # Fetch repo content via GitHub API
-│   ├── document_processor/
-│   │   └── processor.py            # Chunk text into LangChain Documents
-│   ├── embeddings/
-│   │   └── embedding_manager.py    # sentence-transformers embeddings
-│   ├── vector_store/
-│   │   └── chroma_store.py         # ChromaDB vector database wrapper
-│   ├── rag_pipeline/
-│   │   └── pipeline.py             # Retrieval + generation chain
-│   └── agent/
-│       └── workflow.py             # LangGraph agent workflow
-│
-└── utils/
-    └── helpers.py                  # Logging setup & shared utilities
+├── app.py              # FastAPI backend & routes
+├── github_fetcher.py   # Repo data extraction logic
+├── chat.py             # Hybrid rule-based + LLM chat logic
+├── config.py           # Flat application settings
+├── requirements.txt    # Essential python dependencies
+├── .env                # API keys & configuration
+└── static/             # Premium dark-theme frontend
+    ├── index.html
+    ├── script.js
+    └── style.css
 ```
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Clone & Create Virtual Environment
-
-```bash
-git clone <your-repo-url>
-cd "GitHub Repository Analysis Agent"
-python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # macOS/Linux
-```
-
-### 2. Install Dependencies
+### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment
+### 2. Configure Environment
 
-```bash
-copy .env.example .env
-# Edit .env and fill in your API keys
+Create a `.env` file with your keys:
+```env
+GITHUB_TOKEN=your_github_pat
+GROQ_API_KEY=your_groq_key
+LLM_MODEL=llama-3.1-8b-instant
+LOG_LEVEL=INFO
 ```
 
-### 4. Run the Agent
+### 3. Run the App
 
 ```bash
-# Analyze a specific repository
-python main.py --repo langchain-ai/langchain
-
-# Search by topic
-python main.py --topic "machine learning"
-
-# Interactive mode (will prompt you)
-python main.py
+python app.py
 ```
+Visit `http://localhost:8000` to start analyzing.
 
 ---
 
@@ -91,30 +62,11 @@ python main.py
 
 | Component       | Technology                          |
 |-----------------|-------------------------------------|
-| Language        | Python 3.10+                        |
-| LLM Framework  | LangChain + LCEL                    |
-| LLM Provider   | Groq (free, fast inference)          |
-| Agent Framework | LangGraph                           |
-| Embeddings      | sentence-transformers (all-MiniLM-L6-v2) |
-| Vector DB       | ChromaDB                            |
+| Backend         | FastAPI                             |
+| LLM Provider    | Groq (Llama-3.1-8b-instant)         |
+| Analysis        | Rule-based + Selective LLM Context  |
 | GitHub API      | PyGithub                            |
-| Config          | pydantic-settings + .env            |
-| CLI / UX        | Rich                                |
-
----
-
-## 📋 Environment Variables
-
-| Variable           | Description                        | Default              |
-|--------------------|------------------------------------|----------------------|
-| `GITHUB_TOKEN`     | GitHub Personal Access Token       | —                    |
-| `GROQ_API_KEY`     | Groq API key (free at console.groq.com) | —               |
-| `EMBEDDING_MODEL`  | sentence-transformers model name   | `all-MiniLM-L6-v2`  |
-| `LLM_MODEL`        | LLM model identifier              | `llama-3.3-70b-versatile` |
-| `CHROMA_PERSIST_DIR` | ChromaDB storage path            | `./data/chroma_db`  |
-| `CHUNK_SIZE`       | Text chunk size (characters)       | `1000`               |
-| `CHUNK_OVERLAP`    | Overlap between chunks             | `200`                |
-| `LOG_LEVEL`        | Logging level                      | `INFO`               |
+| Frontend        | Vanilla HTML/JS/CSS (Premium Dark)  |
 
 ---
 
