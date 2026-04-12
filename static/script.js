@@ -9,14 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingText = document.getElementById('loading-text');
     
     // Form Inputs
-    const repoNameInput = document.getElementById('repo-name-input');
-    const loadRepoBtn = document.getElementById('load-repo-btn');
-    const topicInput = document.getElementById('topic-input');
-    const searchTopicBtn = document.getElementById('search-topic-btn');
-    const newChatBtn = document.getElementById('new-chat-btn');
+    const repoUrlInput = document.getElementById('repo-url-input');
+    const analyzeRepoBtn = document.getElementById('analyze-repo-btn');
+    const resetSessionBtn = document.getElementById('reset-session-btn');
 
     // UI State
-    let isIngesting = false;
     let isWaitingForAI = false;
     let currentRepo = null;
 
@@ -25,38 +22,70 @@ document.addEventListener('DOMContentLoaded', () => {
         item.addEventListener('click', () => {
             const targetView = item.getAttribute('data-view');
             
-            // Update Nav UI
             navItems.forEach(ni => ni.classList.remove('active'));
             item.classList.add('active');
 
-            // Update View
             views.forEach(v => v.classList.remove('active'));
             document.getElementById(targetView).classList.add('active');
 
-            // Update Title
             const labels = {
                 'chat-view': 'Chat Analysis',
-                'add-repo-view': 'Load Repository',
-                'search-topic-view': 'Topic Discovery'
+                'add-repo-view': 'Analyze Repository'
             };
             document.getElementById('current-view-title').textContent = labels[targetView];
         });
     });
 
-    // --- Chat Logic ---
+    // --- Chat UI Helpers ---
     const appendMessage = (role, text) => {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${role}`;
         
-        // Simple markdown parsing for code blocks and inline code
-        // For a production app, use a library like marked.js
-        const formattedText = text
+        // Basic Markdown-ish formatting
+        let formattedText = text
             .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-            .replace(/`([^`]+)`/g, '<code>$1</code>');
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
 
         msgDiv.innerHTML = `<div class="msg-content">${formattedText}</div>`;
         chatMessages.appendChild(msgDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+    };
+
+    // --- Backend API Calls ---
+    const analyzeRepository = async () => {
+        const repoUrl = repoUrlInput.value.trim();
+        if (!repoUrl) return;
+
+        loadingOverlay.style.display = 'flex';
+        loadingText.textContent = `Analyzing ${repoUrl}...`;
+
+        try {
+            const response = await fetch('/ingest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ repo_url: repoUrl })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                currentRepo = {
+                    name: data.repo_name,
+                    ...data.repo_metadata
+                };
+                updateRepoUI();
+                // Switch to chat view
+                document.querySelector('[data-view="chat-view"]').click();
+                appendMessage('system', `Repository **${currentRepo.name}** analyzed successfully! I've mapped the structure and key files. Ask me anything.`);
+            } else {
+                alert(`Error: ${data.detail}`);
+            }
+        } catch (error) {
+            alert('Failed to connect to the server.');
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
     };
 
     const handleSendMessage = async () => {
@@ -70,10 +99,10 @@ document.addEventListener('DOMContentLoaded', () => {
         isWaitingForAI = true;
         sendBtn.disabled = true;
 
-        // Show "AI is thinking" message placeholder or state
+        // Thinking state
         const aiMsgDiv = document.createElement('div');
         aiMsgDiv.className = 'message system thinking';
-        aiMsgDiv.innerHTML = '<div class="msg-content">Thinking...</div>';
+        aiMsgDiv.innerHTML = '<div class="msg-content">Processing...</div>';
         chatMessages.appendChild(aiMsgDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
 
@@ -85,22 +114,46 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const data = await response.json();
-            
-            // Remove thinking state and add real response
             chatMessages.removeChild(aiMsgDiv);
+
             if (response.ok) {
                 appendMessage('system', data.answer);
             } else {
-                appendMessage('system', `Error: ${data.detail || 'Something went wrong'}`);
+                appendMessage('system', `Error: ${data.detail}`);
             }
         } catch (error) {
             chatMessages.removeChild(aiMsgDiv);
-            appendMessage('system', 'Error: Failed to connect to server.');
+            appendMessage('system', 'Error: Connection failed.');
         } finally {
             isWaitingForAI = false;
             sendBtn.disabled = false;
         }
     };
+
+    const updateRepoUI = () => {
+        if (!currentRepo) return;
+
+        const card = document.getElementById('active-repo-card');
+        card.className = 'repo-card-mini';
+        card.innerHTML = `
+            <span class="name">${currentRepo.name}</span>
+            <span class="desc">${currentRepo.description || 'No description'}</span>
+        `;
+
+        document.getElementById('top-repo-stats').style.display = 'flex';
+        document.getElementById('stat-stars').textContent = currentRepo.stars.toLocaleString();
+        document.getElementById('stat-forks').textContent = currentRepo.forks.toLocaleString();
+        document.getElementById('stat-lang').textContent = currentRepo.language || 'N/A';
+
+        chatInput.disabled = false;
+        sendBtn.disabled = false;
+    };
+
+    // --- Event Listeners ---
+    analyzeRepoBtn.addEventListener('click', analyzeRepository);
+    repoUrlInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') analyzeRepository();
+    });
 
     sendBtn.addEventListener('click', handleSendMessage);
     chatInput.addEventListener('keydown', (e) => {
@@ -110,86 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Auto-resize textarea
     chatInput.addEventListener('input', () => {
         chatInput.style.height = 'auto';
         chatInput.style.height = chatInput.scrollHeight + 'px';
     });
 
-    // --- Ingestion Logic ---
-    const startIngestion = async (payload) => {
-        isIngesting = true;
-        loadingOverlay.style.display = 'flex';
-        loadingText.textContent = payload.repo_name 
-            ? `Ingesting ${payload.repo_name}...` 
-            : `Searching and ingesting topic: ${payload.topic}...`;
-
-        try {
-            const response = await fetch('/ingest', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await response.json();
-            if (response.ok) {
-                currentRepo = data.repo_metadata;
-                updateRepoUI();
-                // Switch to chat view
-                document.querySelector('[data-view="chat-view"]').click();
-                appendMessage('system', `Successfully loaded **${currentRepo.name}**. I am ready to answer your questions about this repository.`);
-            } else {
-                alert(`Error: ${data.detail}`);
-            }
-        } catch (error) {
-            alert('Failed to ingest repository.');
-        } finally {
-            isIngesting = false;
-            loadingOverlay.style.display = 'none';
-        }
-    };
-
-    const updateRepoUI = () => {
-        if (!currentRepo) return;
-
-        // Update active repo card in sidebar
-        const card = document.getElementById('active-repo-card');
-        card.className = 'repo-card-mini';
-        card.innerHTML = `
-            <span class="name">${currentRepo.name}</span>
-            <span class="desc">${currentRepo.description || 'No description'}</span>
-        `;
-
-        // Update Top Bar
-        document.getElementById('top-repo-stats').style.display = 'flex';
-        document.getElementById('stat-stars').textContent = currentRepo.stars.toLocaleString();
-        document.getElementById('stat-forks').textContent = currentRepo.forks.toLocaleString();
-        document.getElementById('stat-lang').textContent = currentRepo.language || 'N/A';
-
-        // Enable chat input
-        chatInput.disabled = false;
-        sendBtn.disabled = false;
-    };
-
-    loadRepoBtn.addEventListener('click', () => {
-        const repoName = repoNameInput.value.trim();
-        if (repoName) startIngestion({ repo_name: repoName });
+    resetSessionBtn.addEventListener('click', () => {
+        window.location.reload();
     });
-
-    searchTopicBtn.addEventListener('click', () => {
-        const topic = topicInput.value.trim();
-        if (topic) startIngestion({ topic: topic });
-    });
-
-    newChatBtn.addEventListener('click', () => {
-        chatMessages.innerHTML = `
-            <div class="message system">
-                <div class="msg-content">Session reset. Ask me anything about the currently loaded repository.</div>
-            </div>
-        `;
-    });
-
-    // Initialize state
-    chatInput.disabled = true;
-    sendBtn.disabled = true;
 });

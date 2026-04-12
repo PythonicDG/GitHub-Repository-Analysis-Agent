@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI GitHub Analyzer</title>
+    <title>GitAnalyzer AI — Simplified</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script src="https://kit.fontawesome.com/your-font-awesome-kit.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="dark-theme">
@@ -27,9 +26,6 @@
                 <button class="nav-item" data-view="add-repo-view">
                     <i class="fas fa-plus-circle"></i> <span>Add Repo</span>
                 </button>
-                <button class="nav-item" data-view="search-topic-view">
-                    <i class="fas fa-search"></i> <span>Search Topic</span>
-                </button>
             </nav>
 
             <div class="repo-history">
@@ -40,8 +36,8 @@
             </div>
 
             <div class="sidebar-footer">
-                <button id="new-chat-btn" class="footer-btn">
-                    <i class="fas fa-rotate-left"></i> <span>New Session</span>
+                <button id="reset-session-btn" class="footer-btn">
+                    <i class="fas fa-rotate-left"></i> <span>Reset Session</span>
                 </button>
             </div>
         </aside>
@@ -68,14 +64,14 @@
                     <div id="chat-messages" class="messages-container">
                         <div class="message system">
                             <div class="msg-content">
-                                Hello! Please load a repository using the sidebar to start the analysis.
+                                Hello! Please add a GitHub repository URL to begin the analysis.
                             </div>
                         </div>
                     </div>
                     
                     <div class="input-area">
                         <div class="input-wrapper">
-                            <textarea id="chat-input" placeholder="Ask anything about the code..." rows="1"></textarea>
+                            <textarea id="chat-input" placeholder="Ask about structure, purpose, or loopholes..." rows="1" disabled></textarea>
                             <button id="send-btn" disabled>
                                 <i class="fas fa-paper-plane"></i>
                             </button>
@@ -86,29 +82,14 @@
                 <!-- Add Repo View -->
                 <div id="add-repo-view" class="view">
                     <div class="form-card">
-                        <h2>Load Repository</h2>
-                        <p>Analyze any public GitHub repository by its full name.</p>
+                        <h2>Analyze Repository</h2>
+                        <p>Enter a GitHub repository URL or "owner/repo" to start.</p>
                         <div class="input-group">
-                            <label for="repo-name-input">Repository Name</label>
-                            <input type="text" id="repo-name-input" placeholder="e.g. langchain-ai/langchain">
+                            <label for="repo-url-input">GitHub Repository</label>
+                            <input type="text" id="repo-url-input" placeholder="e.g. https://github.com/fastapi/fastapi">
                         </div>
-                        <button id="load-repo-btn" class="primary-btn">
-                            <i class="fas fa-cloud-download-alt"></i> Ingest Repository
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Search Topic View -->
-                <div id="search-topic-view" class="view">
-                    <div class="form-card">
-                        <h2>Search by Topic</h2>
-                        <p>Find and analyze trending repositories for a specific topic.</p>
-                        <div class="input-group">
-                            <label for="topic-input">Topic</label>
-                            <input type="text" id="topic-input" placeholder="e.g. machine learning, fastapi, rust">
-                        </div>
-                        <button id="search-topic-btn" class="primary-btn">
-                            <i class="fas fa-magnifying-glass"></i> Search & Analyze
+                        <button id="analyze-repo-btn" class="primary-btn">
+                            <i class="fas fa-bolt"></i> Start Analysis
                         </button>
                     </div>
                 </div>
@@ -121,8 +102,8 @@
     <div id="loading-overlay" class="overlay">
         <div class="loader-content">
             <div class="spinner"></div>
-            <p id="loading-text">Processing repository content...</p>
-            <span class="sub-text">This may take a minute for large repos</span>
+            <p id="loading-text">Analyzing repository architecture...</p>
+            <span class="sub-text">Fetching file tree and key metadata</span>
         </div>
     </div>
 
