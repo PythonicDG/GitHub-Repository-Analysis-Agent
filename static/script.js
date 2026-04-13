@@ -65,7 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/ingest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ repo_url: repoUrl })
+                body: JSON.stringify({ repo_url: repoUrl }),
+                credentials: 'include'
             });
 
             const data = await response.json();
@@ -110,7 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question })
+                body: JSON.stringify({ question }),
+                credentials: 'include'
             });
 
             const data = await response.json();

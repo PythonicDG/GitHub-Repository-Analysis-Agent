@@ -1,23 +1,22 @@
 """
 chat.py
 ------------------------------------------------------------
-Hybrid chat module — uses rule-based logic for simple queries
-and the Groq LLM for complex reasoning.
+RAG chat module — builds selective context from cached repo
+data and uses the Groq LLM for all question answering.
 
 Design:
-  1. Check if the question matches a "rule" (structure, stats,
-     dependencies) → answer instantly without any LLM call.
-  2. If not, build a small, selective context from the cached
-     repo data and send it to the LLM.
-  3. Context budget is kept tight (~2000 tokens) to minimize
-     Groq API usage.
+  1. Build a token-budgeted context from cached repo data
+     (metadata, file summaries, raw code snippets).
+  2. Send the question + context to Groq LLM.
+  3. Context budget is kept under ~5000 tokens to respect
+     Groq free-tier limits.
 ------------------------------------------------------------
 """
 
 import logging
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-
+import os
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -41,107 +40,6 @@ REPOSITORY CONTEXT:
 """
 
 
-# ------------------------------------------------------------------
-# Rule-based answers (no LLM needed)
-# ------------------------------------------------------------------
-
-def _try_rule_based(question: str, repo_data: dict) -> str | None:
-    """
-    Attempt to answer the question without calling the LLM.
-
-    Returns the answer string if a rule matches, or None if
-    the LLM should handle it.
-    """
-    q = question.lower().strip()
-    meta = repo_data.get("metadata", {})
-
-    # --- File structure / tree ---
-    if any(kw in q for kw in ["file structure", "directory", "folder", "tree", "file list", "project structure"]):
-        tree = repo_data.get("file_tree", [])
-        if not tree:
-            return "No file tree information is available for this repository."
-
-        # Build a readable tree
-        dirs = [e["path"] for e in tree if e["type"] == "dir"]
-        files = [e["path"] for e in tree if e["type"] == "file"]
-
-        lines = [f"📁 **{repo_data['name']}** — File Structure\n"]
-        lines.append(f"Total: {len(files)} files, {len(dirs)} directories\n")
-
-        # Show top-level entries first
-        top_level = sorted(set(
-            p.split("/")[0] for p in [e["path"] for e in tree]
-        ))
-        lines.append("**Top-level:**")
-        for item in top_level[:30]:
-            is_dir = any(e["path"] == item and e["type"] == "dir" for e in tree) or \
-                     any(e["path"].startswith(item + "/") for e in tree)
-            icon = "📂" if is_dir else "📄"
-            lines.append(f"  {icon} {item}")
-
-        if len(top_level) > 30:
-            lines.append(f"  ... and {len(top_level) - 30} more")
-
-        return "\n".join(lines)
-
-    # --- Stars / forks / stats ---
-    if any(kw in q for kw in ["how many stars", "star count", "stars"]) and "star" in q:
-        return f"⭐ **{repo_data['name']}** has **{meta.get('stars', 'N/A'):,}** stars."
-
-    if any(kw in q for kw in ["how many forks", "fork count", "forks"]) and "fork" in q:
-        return f"🍴 **{repo_data['name']}** has **{meta.get('forks', 'N/A'):,}** forks."
-
-    if any(kw in q for kw in ["what language", "programming language", "written in", "tech stack"]):
-        lang = meta.get("language", "Unknown")
-        topics = meta.get("topics", [])
-        answer = f"💻 Primary language: **{lang}**"
-        if topics:
-            answer += f"\n🏷️ Topics: {', '.join(topics)}"
-        return answer
-
-    # --- Dependencies ---
-    if any(kw in q for kw in ["dependencies", "packages", "requirements", "what does it use"]):
-        key_files = repo_data.get("key_files", {})
-        dep_files = {k: v for k, v in key_files.items()
-                     if k in ("requirements.txt", "package.json", "pyproject.toml", "Cargo.toml", "go.mod")}
-
-        if not dep_files:
-            return "No dependency files (requirements.txt, package.json, etc.) were found in this repository."
-
-        lines = [f"📦 **Dependencies for {repo_data['name']}:**\n"]
-        for fname, content in dep_files.items():
-            lines.append(f"**{fname}:**")
-            lines.append(f"```\n{content}\n```\n")
-        return "\n".join(lines)
-
-    # --- License ---
-    if "license" in q:
-        return f"📄 License: **{meta.get('license', 'Unknown')}**"
-
-    # --- Contributors ---
-    if any(kw in q for kw in ["contributor", "who made", "who built", "author"]):
-        contributors = meta.get("contributors", [])
-        if contributors:
-            return f"👥 Top contributors: {', '.join(contributors)}"
-        return "Contributor information is not available."
-
-    # --- Basic "what is this repo" ---
-    if any(kw in q for kw in ["what is this", "describe", "overview", "about this repo", "summary"]):
-        desc = meta.get("description", "No description")
-        lang = meta.get("language", "Unknown")
-        stars = meta.get("stars", 0)
-        return (
-            f"## {repo_data['name']}\n\n"
-            f"{desc}\n\n"
-            f"- 💻 Language: **{lang}**\n"
-            f"- ⭐ Stars: **{stars:,}**\n"
-            f"- 🍴 Forks: **{meta.get('forks', 0):,}**\n"
-            f"- 📄 License: **{meta.get('license', 'Unknown')}**\n"
-            f"- 🏷️ Topics: {', '.join(meta.get('topics', [])) or 'None'}"
-        )
-
-    # No rule matched — let the LLM handle it
-    return None
 
 
 # ------------------------------------------------------------------
@@ -151,21 +49,16 @@ def _try_rule_based(question: str, repo_data: dict) -> str | None:
 def _build_context(repo_data: dict, question: str) -> str:
     """
     Build a selective context string for the LLM.
-
-    Keeps it compact to minimize token usage:
-      - Always include metadata summary
-      - Include README (truncated)
-      - Include relevant key files based on the question
-      - Include abbreviated file tree
     """
     parts = []
+    q_lower = question.lower()
 
     # 1. Metadata summary (always included, ~100 tokens)
     meta = repo_data.get("metadata", {})
     parts.append(
         f"[REPOSITORY INFO]\n"
-        f"Name: {repo_data['name']}\n"
-        f"URL: {repo_data['url']}\n"
+        f"Name: {repo_data.get('name', 'Unknown')}\n"
+        f"URL: {repo_data.get('url', 'N/A')}\n"
         f"Description: {meta.get('description', 'N/A')}\n"
         f"Language: {meta.get('language', 'N/A')}\n"
         f"Stars: {meta.get('stars', 0)} | Forks: {meta.get('forks', 0)}\n"
@@ -189,21 +82,51 @@ def _build_context(repo_data: dict, question: str) -> str:
         ))[:40]
         parts.append(f"[FILE TREE — top-level entries]\n" + "\n".join(top_entries))
 
-    # 4. Key files — include ones that seem relevant to the question
+    # 4. Codebase Map — Be selective to save tokens!
+    summaries = repo_data.get("file_summaries", {})
+    if summaries:
+        relevant_summaries = []
+        short_index = []
+        
+        for path, text in summaries.items():
+            path_lower = path.lower()
+            filename_lower = os.path.basename(path).lower()
+            # If the filename or part of the path is mentioned in the question
+            if filename_lower in q_lower or (path_lower in q_lower and len(path_lower) > 3):
+                relevant_summaries.append(f"### TECHNICAL MAP: {path}\n{text}")
+            else:
+                # Otherwise, 1-line index
+                first_line = text.split('\n')[0] if '\n' in text else text[:80]
+                short_index.append(f"- {path}: {first_line}")
+        
+        if short_index:
+            parts.append("[REPOSITORY INDEX]\n" + "\n".join(short_index[:40]))
+        if relevant_summaries:
+            # Limit to top 5 detailed maps to stay under 6k token limit
+            parts.append("[DETAILED FILE DESCRIPTIONS]\n" + "\n\n".join(relevant_summaries[:5]))
+
+    # 5. Key files — ONLY include raw code if implementation details are asked
     key_files = repo_data.get("key_files", {})
-    q_lower = question.lower()
+    # Check for keywords that actually require reading the raw source code
+    needs_code = any(kw in q_lower for kw in ["code", "implement", "fix", "error", "how to", "write", "change", "logic for"])
 
-    for fname, content in key_files.items():
-        # Always include config files (small and useful)
-        # Or include if the filename is mentioned in the question
-        fname_lower = fname.lower()
-        if (fname_lower in q_lower or
-            any(kw in q_lower for kw in ["config", "setup", "docker", "ci", "deploy", "build"]) or
-            fname in ("requirements.txt", "package.json", "pyproject.toml")):
-            # Limit each file to 1500 chars in context
-            parts.append(f"[FILE: {fname}]\n{content[:1500]}")
+    if needs_code:
+        code_snippets = []
+        for fname, content in key_files.items():
+            fname_lower = fname.lower()
+            basename_lower = os.path.basename(fname).lower()
+            if basename_lower in q_lower or (fname_lower in q_lower and len(fname_lower) > 3):
+                # Limit raw code to 1500 chars (down from 2500) to respect Groq limits
+                code_snippets.append(f"[FILE CONTENT: {fname}]\n{content[:1500]}")
+        
+        if code_snippets:
+            # Only include top 3 files' raw code at once
+            parts.append("[RAW SOURCE CODE]\n" + "\n\n".join(code_snippets[:3]))
 
-    return "\n\n---\n\n".join(parts)
+    # FINAL STEP: Strictly enforce the 6k token budget by truncating characters 
+    # (~4 characters = 1 token, so 20,000 chars is roughly 5k tokens)
+    full_context = "\n\n---\n\n".join(parts)
+    return full_context[:20000]
 
 
 def _ask_llm(question: str, context: str) -> str:
@@ -232,26 +155,31 @@ def chat(question: str, repo_data: dict) -> dict:
     """
     Answer a user question about the loaded repository.
 
-    Uses a hybrid approach:
-      1. Try rule-based answer first (free, instant)
-      2. Fall back to LLM with selective context
+    Builds selective context from cached repo data and sends
+    the question to the Groq LLM.
 
-    Returns: {"answer": str, "source": "rule" | "llm"}
+    Returns: {"answer": str, "source": "llm"}
     """
     if not repo_data:
         return {
             "answer": "No repository is loaded. Please add a repository first.",
-            "source": "rule",
+            "source": "llm",
         }
 
-    # Try rule-based answer
-    rule_answer = _try_rule_based(question, repo_data)
-    if rule_answer:
-        logger.info("Answered with rule-based logic (no LLM call)")
-        return {"answer": rule_answer, "source": "rule"}
+    if not question or not question.strip():
+        return {
+            "answer": "Please enter a question.",
+            "source": "llm",
+        }
 
-    # Fall back to LLM
     logger.info("Using LLM for question: %s", question[:80])
     context = _build_context(repo_data, question)
-    llm_answer = _ask_llm(question, context)
+    try:
+        llm_answer = _ask_llm(question, context)
+    except Exception as e:
+        logger.error("LLM call failed: %s", e)
+        return {
+            "answer": f"Sorry, the AI service returned an error: {str(e)}",
+            "source": "llm",
+        }
     return {"answer": llm_answer, "source": "llm"}
