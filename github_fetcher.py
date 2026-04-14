@@ -193,6 +193,7 @@ def fetch_repo(repo_input: str) -> dict:
                 priority = 5 # Default
                 if extension in ('.py', '.js', '.ts', '.go', '.rs'): priority = 1
                 if filename.lower() in [k.lower() for k in KEY_FILES]: priority = 2
+                if filename.lower() in ["core.py", "main.py", "app.py"]: priority = 0 # Highest priority
                 if "test" in item.path.lower(): priority = 10 # Low priority
                 if "docs" in item.path.lower(): priority = 8  # Low priority
 

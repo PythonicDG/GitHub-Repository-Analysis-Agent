@@ -27,6 +27,19 @@ class Settings(BaseSettings):
     # LLM model to use on Groq
     llm_model: str = "llama-3.1-8b-instant"
 
+    # ChromaDB persistence directory
+    chroma_persist_dir: str = "./data/chroma_db"
+
+    # Use Vector DB (ChromaDB) for RAG? If False, falls back to JSON cache.
+    use_vector_db: bool = False
+
+    # Embedding model (sentence-transformers)
+    embedding_model: str = "all-MiniLM-L6-v2"
+
+    # Document chunking
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+
     # Logging level
     log_level: str = "INFO"
 

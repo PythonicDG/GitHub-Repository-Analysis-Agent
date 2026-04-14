@@ -29,6 +29,9 @@ from config import settings
 import github_fetcher
 import chat
 
+if settings.use_vector_db:
+    import vector_store
+
 # Configure logging
 logging.basicConfig(
     level=settings.log_level,
@@ -86,13 +89,15 @@ def _create_session(response: Response) -> str:
 
 
 def _cleanup_sessions():
-    """Remove expired sessions to free memory."""
+    """Remove expired sessions and their ChromaDB collections."""
     now = time.time()
     expired = [
         sid for sid, data in sessions.items()
         if now - data.get("last_active", 0) > SESSION_TIMEOUT
     ]
     for sid in expired:
+        if settings.use_vector_db:
+            vector_store.delete_collection(sid)
         del sessions[sid]
         logger.info("Cleaned up expired session: %s", sid[:8])
 
@@ -114,6 +119,8 @@ def _ensure_session(request: Request, response: Response) -> str:
         if len(sessions) >= MAX_SESSIONS:
             # Force-remove oldest
             oldest = min(sessions, key=lambda s: sessions[s]["last_active"])
+            if settings.use_vector_db:
+                vector_store.delete_collection(oldest)
             del sessions[oldest]
             logger.warning("Force-removed oldest session to make room")
 
@@ -151,7 +158,18 @@ async def ingest_repo(request_body: IngestRequest, request: Request, response: R
             github_fetcher.fetch_repo, request_body.repo_url
         )
         sessions[session_id]["repo_data"] = repo_data
-        logger.info("Session %s: ingested %s", session_id[:8], repo_data["name"])
+        logger.info("Session %s: fetched %s", session_id[:8], repo_data["name"])
+
+        # Embed into ChromaDB for RAG retrieval if enabled
+        if settings.use_vector_db:
+            doc_count = await asyncio.to_thread(
+                vector_store.ingest_repo_data, session_id, repo_data
+            )
+            logger.info(
+                "Session %s: embedded %d documents into ChromaDB",
+                session_id[:8], doc_count,
+            )
+
         return {
             "status": "success",
             "repo_metadata": repo_data["metadata"],
@@ -175,8 +193,9 @@ async def chat_endpoint(request_body: ChatRequest, request: Request, response: R
 
     try:
         # Run the LLM call in a thread pool to stay non-blocking
+        # Pass session_id so chat can use ChromaDB RAG retrieval
         result = await asyncio.to_thread(
-            chat.chat, request_body.question, repo_data
+            chat.chat, request_body.question, repo_data, session_id
         )
         return result
     except Exception as e:

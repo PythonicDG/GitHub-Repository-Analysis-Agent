@@ -1,22 +1,27 @@
 """
 chat.py
 ------------------------------------------------------------
-RAG chat module — builds selective context from cached repo
-data and uses the Groq LLM for all question answering.
+RAG chat module — retrieves context via ChromaDB semantic
+search and falls back to JSON-based context if needed.
 
 Design:
-  1. Build a token-budgeted context from cached repo data
-     (metadata, file summaries, raw code snippets).
-  2. Send the question + context to Groq LLM.
-  3. Context budget is kept under ~5000 tokens to respect
+  1. PRIMARY: Use ChromaDB vector retrieval (semantic search)
+     to build token-budgeted context from embedded repo data.
+  2. FALLBACK: If ChromaDB is unavailable, build context
+     directly from the in-memory repo_data dict (original
+     JSON-based logic).
+  3. Send the question + context to Groq LLM.
+  4. Context budget is kept under ~5000 tokens to respect
      Groq free-tier limits.
 ------------------------------------------------------------
 """
 
 import logging
+import os
+
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-import os
+
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -34,21 +39,140 @@ RULES:
 3. Never fabricate file names, functions, or statistics.
 4. Cite file paths when referencing specific files.
 5. Be concise but thorough.
+6. If the provided code snippets are truncated, state exactly which part is missing instead of guessing the implementation.
 
 REPOSITORY CONTEXT:
 {context}
 """
 
-
+# Keywords that indicate the user needs raw source code
+_CODE_KEYWORDS = [
+    "code", "implement", "fix", "error", "how to",
+    "write", "change", "logic for", "function", "class",
+    "method", "import", "variable", "debug", "snippet", "example",
+]
 
 
 # ------------------------------------------------------------------
-# LLM-based answer
+# RAG context builder (ChromaDB-based)
+# ------------------------------------------------------------------
+
+def _build_context_from_rag(retrieved: dict, question: str) -> str:
+    """
+    Build context string from ChromaDB retrieval results.
+
+    Preserves the same section format as the original JSON builder:
+      [REPOSITORY INFO], [README], [FILE TREE],
+      [REPOSITORY INDEX], [DETAILED FILE DESCRIPTIONS],
+      [RAW SOURCE CODE]
+    """
+    parts = []
+    q_lower = question.lower()
+
+    # 1. Metadata (always included, ~100 tokens)
+    for doc in retrieved.get("metadata_docs", []):
+        parts.append(f"[REPOSITORY INFO]\n{doc['content']}")
+
+    # 2. README (always included, trimmed to budget)
+    readme_docs = retrieved.get("readme_docs", [])
+    if readme_docs:
+        readme_text = "\n".join(doc["content"] for doc in readme_docs)
+        parts.append(f"[README]\n{readme_text[:2500]}")
+
+    # 3. File tree (always included)
+    tree_docs = retrieved.get("tree_docs", [])
+    if tree_docs:
+        tree_text = tree_docs[0]["content"]
+        parts.append(f"[FILE TREE — top-level entries]\n{tree_text}")
+
+    # 4. Repository index (1-line per file from ALL summaries)
+    all_summaries = retrieved.get("all_summaries", [])
+    if all_summaries:
+        index_lines = []
+        for s in sorted(all_summaries, key=lambda x: x["metadata"].get("path", "")):
+            path = s["metadata"].get("path", "unknown")
+            content = s["content"]
+            # Skip the filepath prefix line to get the actual summary
+            lines = content.split("\n")
+            summary_line = ""
+            for line in lines:
+                line = line.strip()
+                if line and line != path:
+                    summary_line = line[:100]
+                    break
+            if summary_line:
+                index_lines.append(f"- {path}: {summary_line}")
+        if index_lines:
+            parts.append(
+                "[REPOSITORY INDEX]\n" + "\n".join(index_lines[:40])
+            )
+
+    # 5. Detailed file descriptions (from semantic search results)
+    relevant = retrieved.get("relevant_docs", [])
+    detailed_summaries = [
+        r for r in relevant
+        if r["metadata"].get("type") == "file_summary"
+    ]
+    if detailed_summaries:
+        detail_parts = []
+        for s in detailed_summaries[:5]:
+            path = s["metadata"].get("path", "unknown")
+            content = s["content"]
+            # Strip the filepath prefix from the content
+            body = content.split("\n", 1)[1].strip() if "\n" in content else content
+            detail_parts.append(f"### TECHNICAL MAP: {path}\n{body}")
+        parts.append(
+            "[DETAILED FILE DESCRIPTIONS]\n" + "\n\n".join(detail_parts)
+        )
+
+    # 6. Tree detail from semantic search (directory listings)
+    tree_details = [
+        r for r in relevant
+        if r["metadata"].get("type") == "file_tree_detail"
+    ]
+    if tree_details:
+        for td in tree_details[:2]:
+            parts.append(f"[DIRECTORY DETAIL]\n{td['content']}")
+
+    # 7. Raw source code (only when question implies need for code)
+    needs_code = any(kw in q_lower for kw in _CODE_KEYWORDS)
+    if needs_code:
+        code_docs = [
+            r for r in relevant
+            if r["metadata"].get("type") == "file_content"
+        ]
+        if code_docs:
+            code_parts = []
+            seen_paths = set()
+            for c in code_docs:
+                path = c["metadata"].get("path", "unknown")
+                if path in seen_paths:
+                    continue
+                seen_paths.add(path)
+                content = c["content"]
+                # Strip the filepath prefix
+                body = content.split("\n", 1)[1].strip() if "\n" in content else content
+                code_parts.append(f"[FILE CONTENT: {path}]\n{body[:1500]}")
+                if len(code_parts) >= 3:
+                    break
+            if code_parts:
+                parts.append(
+                    "[RAW SOURCE CODE]\n" + "\n\n".join(code_parts)
+                )
+
+    # Enforce ~5k token budget (~4 chars/token → 20,000 chars)
+    full_context = "\n\n---\n\n".join(parts)
+    return full_context[:20000]
+
+
+# ------------------------------------------------------------------
+# JSON fallback context builder (original logic preserved)
 # ------------------------------------------------------------------
 
 def _build_context(repo_data: dict, question: str) -> str:
     """
     Build a selective context string for the LLM.
+    Uses the in-memory repo_data dict directly (no vector DB).
     """
     parts = []
     q_lower = question.lower()
@@ -87,7 +211,7 @@ def _build_context(repo_data: dict, question: str) -> str:
     if summaries:
         relevant_summaries = []
         short_index = []
-        
+
         for path, text in summaries.items():
             path_lower = path.lower()
             filename_lower = os.path.basename(path).lower()
@@ -98,7 +222,7 @@ def _build_context(repo_data: dict, question: str) -> str:
                 # Otherwise, 1-line index
                 first_line = text.split('\n')[0] if '\n' in text else text[:80]
                 short_index.append(f"- {path}: {first_line}")
-        
+
         if short_index:
             parts.append("[REPOSITORY INDEX]\n" + "\n".join(short_index[:40]))
         if relevant_summaries:
@@ -107,8 +231,7 @@ def _build_context(repo_data: dict, question: str) -> str:
 
     # 5. Key files — ONLY include raw code if implementation details are asked
     key_files = repo_data.get("key_files", {})
-    # Check for keywords that actually require reading the raw source code
-    needs_code = any(kw in q_lower for kw in ["code", "implement", "fix", "error", "how to", "write", "change", "logic for"])
+    needs_code = any(kw in q_lower for kw in _CODE_KEYWORDS)
 
     if needs_code:
         code_snippets = []
@@ -116,18 +239,22 @@ def _build_context(repo_data: dict, question: str) -> str:
             fname_lower = fname.lower()
             basename_lower = os.path.basename(fname).lower()
             if basename_lower in q_lower or (fname_lower in q_lower and len(fname_lower) > 3):
-                # Limit raw code to 1500 chars (down from 2500) to respect Groq limits
+                # Limit raw code to 1500 chars to respect Groq limits
                 code_snippets.append(f"[FILE CONTENT: {fname}]\n{content[:1500]}")
-        
+
         if code_snippets:
             # Only include top 3 files' raw code at once
             parts.append("[RAW SOURCE CODE]\n" + "\n\n".join(code_snippets[:3]))
 
-    # FINAL STEP: Strictly enforce the 6k token budget by truncating characters 
+    # FINAL STEP: Strictly enforce the 6k token budget by truncating characters
     # (~4 characters = 1 token, so 20,000 chars is roughly 5k tokens)
     full_context = "\n\n---\n\n".join(parts)
     return full_context[:20000]
 
+
+# ------------------------------------------------------------------
+# LLM call
+# ------------------------------------------------------------------
 
 def _ask_llm(question: str, context: str) -> str:
     """Send the question + context to Groq LLM and return the answer."""
@@ -151,12 +278,12 @@ def _ask_llm(question: str, context: str) -> str:
 # Public API
 # ------------------------------------------------------------------
 
-def chat(question: str, repo_data: dict) -> dict:
+def chat(question: str, repo_data: dict, session_id: str = None) -> dict:
     """
     Answer a user question about the loaded repository.
 
-    Builds selective context from cached repo data and sends
-    the question to the Groq LLM.
+    If session_id is provided, uses ChromaDB RAG retrieval.
+    Falls back to JSON-based context if RAG is unavailable.
 
     Returns: {"answer": str, "source": "llm"}
     """
@@ -172,8 +299,36 @@ def chat(question: str, repo_data: dict) -> dict:
             "source": "llm",
         }
 
-    logger.info("Using LLM for question: %s", question[:80])
-    context = _build_context(repo_data, question)
+    # --- Build context: RAG primary, JSON fallback ---
+    context = None
+
+    if session_id and settings.use_vector_db:
+        try:
+            import vector_store
+            retrieved = vector_store.retrieve_context(session_id, question)
+            # Verify we got meaningful results (at least metadata)
+            if retrieved and retrieved.get("metadata_docs"):
+                context = _build_context_from_rag(retrieved, question)
+                logger.info(
+                    "RAG context built: %d chars (session %s)",
+                    len(context), session_id[:8],
+                )
+            else:
+                logger.warning(
+                    "RAG returned empty results for session %s, falling back to JSON",
+                    session_id[:8],
+                )
+        except Exception as exc:
+            logger.warning(
+                "RAG retrieval failed, falling back to JSON context: %s", exc
+            )
+
+    # Fallback to JSON-based context
+    if context is None:
+        context = _build_context(repo_data, question)
+        logger.info("Using JSON fallback context: %d chars", len(context))
+
+    # --- Send to LLM ---
     try:
         llm_answer = _ask_llm(question, context)
     except Exception as e:
@@ -182,4 +337,5 @@ def chat(question: str, repo_data: dict) -> dict:
             "answer": f"Sorry, the AI service returned an error: {str(e)}",
             "source": "llm",
         }
+
     return {"answer": llm_answer, "source": "llm"}
