@@ -1,19 +1,7 @@
 """
 chat.py
-------------------------------------------------------------
 RAG chat module — retrieves context via ChromaDB semantic
 search and falls back to JSON-based context if needed.
-
-Design:
-  1. PRIMARY: Use ChromaDB vector retrieval (semantic search)
-     to build token-budgeted context from embedded repo data.
-  2. FALLBACK: If ChromaDB is unavailable, build context
-     directly from the in-memory repo_data dict (original
-     JSON-based logic).
-  3. Send the question + context to Groq LLM.
-  4. Context budget is kept under ~5000 tokens to respect
-     Groq free-tier limits.
-------------------------------------------------------------
 """
 
 import logging
@@ -26,9 +14,7 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# ------------------------------------------------------------------
-# System prompt — strict anti-hallucination
-# ------------------------------------------------------------------
+# System prompt
 SYSTEM_PROMPT = """\
 You are a GitHub repository analysis assistant. Answer questions
 about the repository using ONLY the context provided below.
@@ -53,9 +39,7 @@ _CODE_KEYWORDS = [
 ]
 
 
-# ------------------------------------------------------------------
-# RAG context builder (ChromaDB-based)
-# ------------------------------------------------------------------
+# RAG context builder
 
 def _build_context_from_rag(retrieved: dict, question: str) -> str:
     """
@@ -165,9 +149,7 @@ def _build_context_from_rag(retrieved: dict, question: str) -> str:
     return full_context[:20000]
 
 
-# ------------------------------------------------------------------
-# JSON fallback context builder (original logic preserved)
-# ------------------------------------------------------------------
+# JSON fallback context builder
 
 def _build_context(repo_data: dict, question: str) -> str:
     """
@@ -252,9 +234,7 @@ def _build_context(repo_data: dict, question: str) -> str:
     return full_context[:20000]
 
 
-# ------------------------------------------------------------------
 # LLM call
-# ------------------------------------------------------------------
 
 def _ask_llm(question: str, context: str) -> str:
     """Send the question + context to Groq LLM and return the answer."""
@@ -274,9 +254,7 @@ def _ask_llm(question: str, context: str) -> str:
     return response.content
 
 
-# ------------------------------------------------------------------
 # Public API
-# ------------------------------------------------------------------
 
 def chat(question: str, repo_data: dict, session_id: str = None) -> dict:
     """
