@@ -1,9 +1,7 @@
 """
 config.py
-------------------------------------------------------------
 Flat application settings loaded from .env file.
 Uses pydantic-settings for type-safe, validated config.
-------------------------------------------------------------
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
