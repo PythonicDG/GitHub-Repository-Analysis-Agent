@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isWaitingForAI = false;
     let currentRepo = null;
 
-    // --- Navigation Logic ---
+    // Navigation Logic
     navItems.forEach(item => {
         item.addEventListener('click', () => {
             const targetView = item.getAttribute('data-view');
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Chat UI Helpers ---
+    // Chat UI Helpers
     const appendMessage = (role, text) => {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${role}`;
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     };
 
-    // --- Backend API Calls ---
+    // Backend API Calls
     const analyzeRepository = async () => {
         const repoUrl = repoUrlInput.value.trim();
         if (!repoUrl) return;
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sendBtn.disabled = false;
     };
 
-    // --- Event Listeners ---
+    // Event Listeners
     analyzeRepoBtn.addEventListener('click', analyzeRepository);
     repoUrlInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') analyzeRepository();
