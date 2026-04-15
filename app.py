@@ -1,14 +1,12 @@
 """
 app.py
-------------------------------------------------------------
 FastAPI application for the GitHub Repository Analysis Agent.
 
-Production-ready for ~10 concurrent users:
-  - Session-based repo storage (each user gets their own context)
-  - Non-blocking ingestion (async thread pool)
-  - CORS middleware for cross-origin deployments
-  - Automatic session cleanup for memory management
-------------------------------------------------------------
+Features:
+- Session-based repo storage
+- Non-blocking ingestion
+- CORS middleware
+- Automatic session cleanup
 """
 
 import asyncio
@@ -56,9 +54,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# ------------------------------------------------------------------
-# Session-based storage (replaces global variable)
-# ------------------------------------------------------------------
+# Session-based storage
 # Each user gets a unique session_id stored in a cookie.
 # Their repo data is stored in this dict, keyed by session_id.
 
@@ -127,9 +123,7 @@ def _ensure_session(request: Request, response: Response) -> str:
     return _create_session(response)
 
 
-# ------------------------------------------------------------------
 # Request/Response Models
-# ------------------------------------------------------------------
 
 class IngestRequest(BaseModel):
     repo_url: str
@@ -138,9 +132,7 @@ class ChatRequest(BaseModel):
     question: str
 
 
-# ------------------------------------------------------------------
 # Routes
-# ------------------------------------------------------------------
 
 @app.get("/")
 async def read_index():
@@ -218,9 +210,7 @@ async def get_status(request: Request, response: Response):
     return {"current_repo": None, "active_sessions": len(sessions)}
 
 
-# ------------------------------------------------------------------
 # Entry point
-# ------------------------------------------------------------------
 
 if __name__ == "__main__":
     import uvicorn
