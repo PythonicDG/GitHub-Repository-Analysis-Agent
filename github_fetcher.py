@@ -1,16 +1,7 @@
 """
 github_fetcher.py
-------------------------------------------------------------
 Fetches repository data from the GitHub API.
-
-Extracts only what's needed for analysis:
-  - Basic metadata (stars, forks, language, etc.)
-  - File tree (limited depth & count)
-  - README content (truncated)
-  - Key config files (package.json, requirements.txt, etc.)
-
 Results are cached as JSON so repeated analysis is free.
-------------------------------------------------------------
 """
 
 import base64
@@ -74,9 +65,7 @@ TEXT_EXTENSIONS = {
 MAX_FILES_TO_SUMMARIZE = 30
 
 
-# ------------------------------------------------------------------
 # URL normalization
-# ------------------------------------------------------------------
 
 def normalize_repo_name(repo_input: str) -> str:
     """
@@ -107,9 +96,7 @@ def normalize_repo_name(repo_input: str) -> str:
     return repo_input.removesuffix(".git")
 
 
-# ------------------------------------------------------------------
 # Main fetch function
-# ------------------------------------------------------------------
 
 def fetch_repo(repo_input: str) -> dict:
     """
@@ -248,9 +235,7 @@ def fetch_repo(repo_input: str) -> dict:
     return result
 
 
-# ------------------------------------------------------------------
 # Metadata extraction
-# ------------------------------------------------------------------
 
 def _extract_metadata(repo) -> dict:
     """Pull essential metadata fields from the repo object."""
@@ -276,9 +261,7 @@ def _extract_metadata(repo) -> dict:
     return meta
 
 
-# ------------------------------------------------------------------
 # Cache helpers
-# ------------------------------------------------------------------
 
 def _cache_path(repo_name: str) -> Path:
     """Get the cache file path for a repo."""
@@ -305,9 +288,7 @@ def _save_cache(repo_name: str, data: dict) -> None:
     logger.info("Cached repo data to %s", path)
 
 
-# ------------------------------------------------------------------
 # LLM Summarization
-# ------------------------------------------------------------------
 
 def _summarize_file(filepath: str, content: str) -> str | None:
     """Use the LLM to generate a 1-2 sentence summary of a file."""
