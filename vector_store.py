@@ -1,15 +1,10 @@
 """
 vector_store.py
-------------------------------------------------------------
 ChromaDB-backed vector store for the RAG pipeline.
-
 Handles:
-  - Chunking and embedding repo data (metadata, README,
-    file tree, summaries, code) into session-scoped collections.
-  - Semantic retrieval with always-included context
-    (metadata, README, tree) plus ranked results.
-  - Collection lifecycle management (create, query, delete).
-------------------------------------------------------------
+  - Chunking and embedding repo data
+  - Semantic retrieval
+  - Collection lifecycle management
 """
 
 import hashlib
@@ -24,9 +19,7 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# ------------------------------------------------------------------
-# Singletons (lazy-initialized)
-# ------------------------------------------------------------------
+# Singletons
 
 _chroma_client = None
 _embedding_fn = None
@@ -63,9 +56,7 @@ def _collection_name(session_id: str) -> str:
     return f"repo_{hashed}"
 
 
-# ------------------------------------------------------------------
 # Text chunking
-# ------------------------------------------------------------------
 
 def _chunk_text(
     text: str,
@@ -107,9 +98,7 @@ def _chunk_text(
     return chunks
 
 
-# ------------------------------------------------------------------
-# Ingestion — repo data → ChromaDB
-# ------------------------------------------------------------------
+# Ingestion
 
 def ingest_repo_data(session_id: str, repo_data: dict) -> int:
     """
@@ -245,9 +234,7 @@ def ingest_repo_data(session_id: str, repo_data: dict) -> int:
     return len(documents)
 
 
-# ------------------------------------------------------------------
-# Retrieval — semantic search + always-included context
-# ------------------------------------------------------------------
+# Retrieval
 
 def retrieve_context(session_id: str, query: str, top_k: int = 12) -> dict:
     """
@@ -358,9 +345,7 @@ def retrieve_context(session_id: str, query: str, top_k: int = 12) -> dict:
     return result
 
 
-# ------------------------------------------------------------------
 # Cleanup
-# ------------------------------------------------------------------
 
 def delete_collection(session_id: str) -> None:
     """Delete the ChromaDB collection for a session."""
