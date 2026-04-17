@@ -170,7 +170,10 @@ def _build_context(repo_data: dict, question: str) -> str:
         f"Stars: {meta.get('stars', 0)} | Forks: {meta.get('forks', 0)}\n"
         f"License: {meta.get('license', 'N/A')}\n"
         f"Topics: {', '.join(meta.get('topics', []))}\n"
-        f"Contributors: {', '.join(meta.get('contributors', []))}"
+        f"Contributors: {', '.join(meta.get('contributors', []))}\n"
+        f"Open Issues: {meta.get('open_issues', 0)}\n"
+        f"Default Branch: {meta.get('default_branch', 'main')}\n"
+        f"Last Updated: {meta.get('last_updated', 'Unknown')}"
     )
 
     # 2. README (always included, already truncated during fetch)
