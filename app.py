@@ -184,7 +184,6 @@ async def chat_endpoint(request_body: ChatRequest, request: Request, response: R
         raise HTTPException(status_code=400, detail="Please ingest a repository first")
 
     try:
-        # Pass session_id so chat can use ChromaDB RAG retrieval
         result = await asyncio.to_thread(
             chat.chat, request_body.question, repo_data, session_id
         )
