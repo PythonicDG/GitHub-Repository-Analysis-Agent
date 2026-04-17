@@ -96,6 +96,24 @@ def normalize_repo_name(repo_input: str) -> str:
     return repo_input.removesuffix(".git")
 
 
+# SHA validation
+
+def _get_latest_sha(repo_name: str) -> str | None:
+    """
+    Make a lightweight API call to get the latest commit SHA
+    of the repo's default branch. Uses only 1 API request.
+    Returns None if the check fails (e.g. rate limit).
+    """
+    try:
+        client = Github(settings.github_token) if settings.github_token else Github()
+        repo = client.get_repo(repo_name)
+        branch = repo.get_branch(repo.default_branch)
+        return branch.commit.sha
+    except Exception as e:
+        logger.debug("SHA check failed for %s: %s", repo_name, e)
+        return None
+
+
 # Main fetch function
 
 def fetch_repo(repo_input: str) -> dict:
@@ -105,17 +123,32 @@ def fetch_repo(repo_input: str) -> dict:
     Returns a dict with: name, url, metadata, file_tree, readme,
     key_files (dict of filename → content).
 
-    Results are cached to data/cache/ so the same repo isn't
-    re-fetched unnecessarily.
+    Results are cached to data/cache/ with SHA-validation.
+    If the repo has new commits since last cache, we re-fetch.
     """
     repo_name = normalize_repo_name(repo_input)
     logger.info("Fetching repository: %s", repo_name)
 
-    # Check cache first
+    # Check cache with SHA-validation
     cached = _load_cache(repo_name)
     if cached:
-        logger.info("Loaded %s from cache", repo_name)
-        return cached
+        cached_sha = cached.get("latest_commit_sha")
+        live_sha = _get_latest_sha(repo_name)
+
+        if live_sha and cached_sha == live_sha:
+            logger.info("Cache is fresh for %s (SHA: %s)", repo_name, cached_sha[:8])
+            return cached
+        elif live_sha:
+            logger.info(
+                "Cache is stale for %s (cached: %s, live: %s). Re-fetching...",
+                repo_name,
+                (cached_sha or "none")[:8],
+                live_sha[:8],
+            )
+        else:
+            # SHA check failed (rate limit etc.), use cache as fallback
+            logger.warning("SHA check failed for %s, using cached data as fallback", repo_name)
+            return cached
 
     # Connect to GitHub
     client = Github(settings.github_token) if settings.github_token else Github()
@@ -129,15 +162,22 @@ def fetch_repo(repo_input: str) -> dict:
             raise ValueError("GitHub API rate limit exceeded. Try again later or add a token.")
         raise ValueError(f"GitHub API error: {e.data.get('message', str(e))}")
 
+    # Store latest commit SHA for future cache validation
+    try:
+        latest_sha = repo.get_branch(repo.default_branch).commit.sha
+    except Exception:
+        latest_sha = None
+
     # Build result dict
     result = {
         "name": repo.full_name,
         "url": repo.html_url,
+        "latest_commit_sha": latest_sha,
         "metadata": _extract_metadata(repo),
         "file_tree": [],
         "readme": "",
         "key_files": {},
-        "file_summaries": {},  # New: Store LLM-generated summaries
+        "file_summaries": {},
     }
 
     # Fetch README
