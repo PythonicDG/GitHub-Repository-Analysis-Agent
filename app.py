@@ -184,7 +184,6 @@ async def chat_endpoint(request_body: ChatRequest, request: Request, response: R
         raise HTTPException(status_code=400, detail="Please ingest a repository first")
 
     try:
-        # Run the LLM call in a thread pool to stay non-blocking
         # Pass session_id so chat can use ChromaDB RAG retrieval
         result = await asyncio.to_thread(
             chat.chat, request_body.question, repo_data, session_id
@@ -209,8 +208,6 @@ async def get_status(request: Request, response: Response):
         }
     return {"current_repo": None, "active_sessions": len(sessions)}
 
-
-# Entry point
 
 if __name__ == "__main__":
     import uvicorn
