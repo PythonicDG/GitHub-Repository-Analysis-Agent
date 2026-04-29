@@ -231,8 +231,8 @@ def _build_context(repo_data: dict, question: str) -> str:
             # Only include top 3 files' raw code at once
             parts.append("[RAW SOURCE CODE]\n" + "\n\n".join(code_snippets[:3]))
 
-    # FINAL STEP: Strictly enforce the 6k token budget by truncating characters
-    # (~4 characters = 1 token, so 20,000 chars is roughly 5k tokens)
+    # FINAL STEP: Strictly enforce the 6k token budget by truncating characters.
+    # Note: We use a conservative 4 characters per token estimate (20,000 chars ≈ 5,000 tokens).
     full_context = "\n\n---\n\n".join(parts)
     return full_context[:20000]
 

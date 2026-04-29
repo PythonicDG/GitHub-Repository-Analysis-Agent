@@ -6,15 +6,7 @@ An intelligent agent that fetches GitHub repositories, processes their content, 
 
 ---
 
-## ✨ Features
 
-- **Direct Repo Analysis** — Input any GitHub URL or `owner/repo` to start.
-- **Efficient Extraction** — Fetches metadata, file tree, and key project files (package.json, Dockerfile, etc.).
-- **Hybrid Chat Logic** — Instantly answers factual questions (stars, structure) via rule-based logic to save tokens.
-- **LLM-Powered Insights** — Uses Groq (Llama-3.1-8b) with selective context for complex reasoning.
-- **Zero-DB Architecture** — No vector store or embeddings required; uses simple JSON caching for speed.
-
----
 
 ## 📁 Project Structure
 

@@ -136,11 +136,16 @@ class ChatRequest(BaseModel):
 
 @app.get("/")
 async def read_index():
+    """Serve the landing page of the application."""
     return FileResponse("static/index.html")
 
 
 @app.post("/ingest")
 async def ingest_repo(request_body: IngestRequest, request: Request, response: Response):
+    """
+    Ingest a GitHub repository.
+    Fetches repo metadata and contents, and optionally embeds them for RAG.
+    """
     session_id = _ensure_session(request, response)
 
     try:
