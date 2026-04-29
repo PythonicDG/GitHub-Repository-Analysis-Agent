@@ -79,22 +79,30 @@ def _chunk_text(
     start = 0
     while start < len(text):
         end = min(start + chunk_size, len(text))
-        chunk = text[start:end]
-
-        # Prefer breaking at a newline in the back half of the chunk
+        
+        # Try to find a good breaking point (double newline for paragraphs or code blocks)
         if end < len(text):
-            last_nl = chunk.rfind("\n", int(chunk_size * 0.5))
-            if last_nl != -1:
-                end = start + last_nl + 1
-                chunk = text[start:end]
+            # Look for double newline first (preferred)
+            last_double_nl = text.rfind("\n\n", start + int(chunk_size * 0.4), end)
+            if last_double_nl != -1:
+                end = last_double_nl + 2
+            else:
+                # Fallback to single newline
+                last_nl = text.rfind("\n", start + int(chunk_size * 0.4), end)
+                if last_nl != -1:
+                    end = last_nl + 1
+        
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
 
-        stripped = chunk.strip()
-        if stripped:
-            chunks.append(stripped)
-
-        # Advance; overlap keeps continuity between chunks
-        start = end - overlap if end < len(text) else len(text)
-
+        if end >= len(text):
+            break
+            
+        start = end - overlap
+        if start >= end: # Prevent infinite loop if overlap >= chunk_size
+            start = end - 1
+            
     return chunks
 
 
