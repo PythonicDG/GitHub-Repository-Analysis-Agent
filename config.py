@@ -42,5 +42,6 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
 
-# Singleton — import this everywhere
+# Initialize application settings singleton.
+# This should be imported throughout the app for consistent configuration.
 settings = Settings()
