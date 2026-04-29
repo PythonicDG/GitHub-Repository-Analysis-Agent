@@ -41,16 +41,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${role}`;
         
-        // Basic Markdown-ish formatting
+        // Improved Markdown formatting
         let formattedText = text
             .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
             .replace(/`([^`]+)`/g, '<code>$1</code>')
             .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/^\s*-\s+(.+)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
             .replace(/\n/g, '<br>');
 
         msgDiv.innerHTML = `<div class="msg-content">${formattedText}</div>`;
         chatMessages.appendChild(msgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        chatMessages.scrollTo({
+            top: chatMessages.scrollHeight,
+            behavior: 'smooth'
+        });
     };
 
     // Backend API Calls
