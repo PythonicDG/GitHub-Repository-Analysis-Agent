@@ -154,12 +154,23 @@ def fetch_repo(repo_input: str) -> dict:
     client = Github(settings.github_token) if settings.github_token else Github()
 
     try:
+        # Check rate limit before proceeding
+        rate_limit = client.get_rate_limit()
+        core_rate = rate_limit.core
+        if core_rate.remaining < 10:
+            reset_time = core_rate.reset.strftime('%H:%M:%S')
+            raise ValueError(f"GitHub API rate limit critical: {core_rate.remaining} remaining. Resets at {reset_time}.")
+            
         repo = client.get_repo(repo_name)
     except GithubException as e:
         if e.status == 404:
             raise ValueError(f"Repository '{repo_name}' not found. Check the name or URL.")
         elif e.status == 403:
-            raise ValueError("GitHub API rate limit exceeded. Try again later or add a token.")
+            reset_time = getattr(e, 'headers', {}).get('x-ratelimit-reset')
+            if reset_time:
+                reset_date = time.strftime('%H:%M:%S', time.localtime(int(reset_time)))
+                raise ValueError(f"GitHub API rate limit exceeded. Resets at {reset_date}.")
+            raise ValueError("GitHub API rate limit exceeded or access denied.")
         raise ValueError(f"GitHub API error: {e.data.get('message', str(e))}")
 
     # Store latest commit SHA for future cache validation
