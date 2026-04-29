@@ -19,3 +19,5 @@ pydantic-settings>=2.3.0
 # --- RAG Vector Store ---
 chromadb>=0.4.0
 sentence-transformers>=2.2.0
+
+# Note: Requires Python 3.10 or higher for best compatibility
