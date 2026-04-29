@@ -127,6 +127,7 @@ def ingest_repo_data(session_id: str, repo_data: dict) -> int:
     collection = client.get_or_create_collection(
         name=col_name,
         embedding_function=_get_embedding_fn(),
+        # Use cosine similarity as it performs well for high-dimensional text embeddings
         metadata={"hnsw:space": "cosine"},
     )
 
