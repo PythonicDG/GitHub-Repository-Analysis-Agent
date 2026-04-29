@@ -7,10 +7,12 @@
     --text-dim: #94a3b8;
     --glass-bg: rgba(255, 255, 255, 0.05);
     --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-intensity: blur(20px);
     --msg-ai: #1e293b;
     --msg-user: #312e81;
     --success: #10b981;
     --error: #ef4444;
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
