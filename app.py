@@ -181,6 +181,10 @@ async def ingest_repo(request_body: IngestRequest, request: Request, response: R
 
 @app.post("/chat")
 async def chat_endpoint(request_body: ChatRequest, request: Request, response: Response):
+    """
+    Handle chat questions about the current repository.
+    Uses RAG retrieval if a session exists.
+    """
     session_id = _ensure_session(request, response)
     session = sessions.get(session_id, {})
     repo_data = session.get("repo_data")
@@ -200,6 +204,7 @@ async def chat_endpoint(request_body: ChatRequest, request: Request, response: R
 
 @app.get("/status")
 async def get_status(request: Request, response: Response):
+    """Get the current status of the session and loaded repository."""
     session_id = _ensure_session(request, response)
     session = sessions.get(session_id, {})
     repo_data = session.get("repo_data")
