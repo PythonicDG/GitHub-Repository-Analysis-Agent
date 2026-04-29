@@ -140,6 +140,17 @@ async def read_index():
     return FileResponse("static/index.html")
 
 
+@app.get("/health")
+async def health_check():
+    """Simple health check endpoint."""
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "active_sessions": len(sessions),
+        "use_vector_db": settings.use_vector_db
+    }
+
+
 @app.post("/ingest")
 async def ingest_repo(request_body: IngestRequest, request: Request, response: Response):
     """
