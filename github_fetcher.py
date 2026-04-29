@@ -278,7 +278,10 @@ def fetch_repo(repo_input: str) -> dict:
 # Metadata extraction
 
 def _extract_metadata(repo) -> dict:
-    """Pull essential metadata fields from the repo object."""
+    """
+    Pull essential metadata fields from the PyGithub repository object.
+    Includes description, stars, forks, primary language, topics, and top contributors.
+    """
     meta = {
         "description": repo.description or "No description",
         "stars": repo.stargazers_count,
