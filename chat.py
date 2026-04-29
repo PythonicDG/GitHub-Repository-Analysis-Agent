@@ -50,32 +50,41 @@ def _build_context_from_rag(retrieved: dict, question: str) -> str:
       [REPOSITORY INDEX], [DETAILED FILE DESCRIPTIONS],
       [RAW SOURCE CODE]
     """
-    parts = []
+    parts: list[str] = []
     q_lower = question.lower()
 
     # 1. Metadata (always included, ~100 tokens)
-    for doc in retrieved.get("metadata_docs", []):
-        parts.append(f"[REPOSITORY INFO]\n{doc['content']}")
+    metadata_docs = retrieved.get("metadata_docs", [])
+    for doc in metadata_docs:
+        parts.append(f"[REPOSITORY INFO]\n{doc.get('content', '')}")
 
     # 2. README (always included, trimmed to budget)
     readme_docs = retrieved.get("readme_docs", [])
     if readme_docs:
-        readme_text = "\n".join(doc["content"] for doc in readme_docs)
+        readme_text = "\n".join(doc.get("content", "") for doc in readme_docs)
         parts.append(f"[README]\n{readme_text[:2500]}")
 
     # 3. File tree (always included)
     tree_docs = retrieved.get("tree_docs", [])
     if tree_docs:
-        tree_text = tree_docs[0]["content"]
+        tree_text = tree_docs[0].get("content", "")
         parts.append(f"[FILE TREE — top-level entries]\n{tree_text}")
 
     # 4. Repository index (1-line per file from ALL summaries)
     all_summaries = retrieved.get("all_summaries", [])
     if all_summaries:
-        index_lines = []
-        for s in sorted(all_summaries, key=lambda x: x["metadata"].get("path", "")):
-            path = s["metadata"].get("path", "unknown")
-            content = s["content"]
+        index_lines: list[str] = []
+        # Sort by path for consistent ordering
+        sorted_summaries = sorted(
+            all_summaries, 
+            key=lambda x: x.get("metadata", {}).get("path", "")
+        )
+        
+        for s in sorted_summaries:
+            metadata = s.get("metadata", {})
+            path = metadata.get("path", "unknown")
+            content = s.get("content", "")
+            
             # Skip the filepath prefix line to get the actual summary
             lines = content.split("\n")
             summary_line = ""
@@ -86,6 +95,7 @@ def _build_context_from_rag(retrieved: dict, question: str) -> str:
                     break
             if summary_line:
                 index_lines.append(f"- {path}: {summary_line}")
+        
         if index_lines:
             parts.append(
                 "[REPOSITORY INDEX]\n" + "\n".join(index_lines[:40])
@@ -95,16 +105,19 @@ def _build_context_from_rag(retrieved: dict, question: str) -> str:
     relevant = retrieved.get("relevant_docs", [])
     detailed_summaries = [
         r for r in relevant
-        if r["metadata"].get("type") == "file_summary"
+        if r.get("metadata", {}).get("type") == "file_summary"
     ]
+    
     if detailed_summaries:
-        detail_parts = []
+        detail_parts: list[str] = []
         for s in detailed_summaries[:5]:
-            path = s["metadata"].get("path", "unknown")
-            content = s["content"]
+            metadata = s.get("metadata", {})
+            path = metadata.get("path", "unknown")
+            content = s.get("content", "")
             # Strip the filepath prefix from the content
             body = content.split("\n", 1)[1].strip() if "\n" in content else content
             detail_parts.append(f"### TECHNICAL MAP: {path}\n{body}")
+        
         parts.append(
             "[DETAILED FILE DESCRIPTIONS]\n" + "\n\n".join(detail_parts)
         )
@@ -112,33 +125,35 @@ def _build_context_from_rag(retrieved: dict, question: str) -> str:
     # 6. Tree detail from semantic search (directory listings)
     tree_details = [
         r for r in relevant
-        if r["metadata"].get("type") == "file_tree_detail"
+        if r.get("metadata", {}).get("type") == "file_tree_detail"
     ]
     if tree_details:
         for td in tree_details[:2]:
-            parts.append(f"[DIRECTORY DETAIL]\n{td['content']}")
+            parts.append(f"[DIRECTORY DETAIL]\n{td.get('content', '')}")
 
     # 7. Raw source code (only when question implies need for code)
     needs_code = any(kw in q_lower for kw in _CODE_KEYWORDS)
     if needs_code:
         code_docs = [
             r for r in relevant
-            if r["metadata"].get("type") == "file_content"
+            if r.get("metadata", {}).get("type") == "file_content"
         ]
         if code_docs:
-            code_parts = []
-            seen_paths = set()
+            code_parts: list[str] = []
+            seen_paths: set[str] = set()
             for c in code_docs:
-                path = c["metadata"].get("path", "unknown")
+                metadata = c.get("metadata", {})
+                path = metadata.get("path", "unknown")
                 if path in seen_paths:
                     continue
                 seen_paths.add(path)
-                content = c["content"]
+                content = c.get("content", "")
                 # Strip the filepath prefix
                 body = content.split("\n", 1)[1].strip() if "\n" in content else content
                 code_parts.append(f"[FILE CONTENT: {path}]\n{body[:1500]}")
                 if len(code_parts) >= 3:
                     break
+            
             if code_parts:
                 parts.append(
                     "[RAW SOURCE CODE]\n" + "\n\n".join(code_parts)
