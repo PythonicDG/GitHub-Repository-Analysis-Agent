@@ -69,7 +69,12 @@ MAX_FILES_TO_SUMMARIZE = 30
 
 def normalize_repo_name(repo_input: str) -> str:
     """
-    Convert any GitHub reference to 'owner/repo' format.
+    Normalize a variety of GitHub repository reference formats into a standard 
+    'owner/repository' string.
+
+    This utility handles direct name strings, full HTTPS URLs (with or without 
+    the .git suffix), and SSH connection strings, ensuring the rest of the 
+    application can work with a consistent repository identifier.
 
     Accepts:
       - "owner/repo"
