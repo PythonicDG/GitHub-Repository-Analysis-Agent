@@ -45,6 +45,11 @@ def _build_context_from_rag(retrieved: dict, question: str) -> str:
     """
     Build context string from ChromaDB retrieval results.
 
+    This function aggregates different types of retrieved documents (metadata, 
+    README, file tree, summaries, and source code) into a single context string 
+    formatted for the LLM. It maintains a specific section order and respects 
+    token/character limits.
+
     Preserves the same section format as the original JSON builder:
       [REPOSITORY INFO], [README], [FILE TREE],
       [REPOSITORY INDEX], [DETAILED FILE DESCRIPTIONS],
