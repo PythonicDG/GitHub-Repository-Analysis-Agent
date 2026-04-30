@@ -105,9 +105,15 @@ def normalize_repo_name(repo_input: str) -> str:
 
 def _get_latest_sha(repo_name: str) -> str | None:
     """
-    Make a lightweight API call to get the latest commit SHA
-    of the repo's default branch. Uses only 1 API request.
-    Returns None if the check fails (e.g. rate limit).
+    Retrieve the most recent commit SHA from the repository's default branch.
+
+    This function performs a lightweight API call to fetch the current state of 
+     the repository. It is primarily used for cache validation to determine if 
+     the local data is still up-to-date with the remote version.
+
+    Returns:
+        str | None: The 40-character commit SHA, or None if the retrieval fails 
+        (e.g., due to connectivity issues or rate limiting).
     """
     try:
         client = Github(settings.github_token) if settings.github_token else Github()
