@@ -174,7 +174,11 @@ def _build_context_from_rag(retrieved: dict, question: str) -> str:
 def _build_context(repo_data: dict, question: str) -> str:
     """
     Build a selective context string for the LLM.
-    Uses the in-memory repo_data dict directly (no vector DB).
+    
+    This function is used as a fallback when the vector database is unavailable.
+    It uses the in-memory repo_data dictionary directly to construct a context 
+    string, applying heuristics to select the most relevant parts of the 
+    repository to fit within token limits.
     """
     parts = []
     q_lower = question.lower()
