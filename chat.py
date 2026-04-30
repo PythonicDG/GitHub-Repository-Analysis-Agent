@@ -264,7 +264,13 @@ def _build_context(repo_data: dict, question: str) -> str:
 # LLM call
 
 def _ask_llm(question: str, context: str) -> str:
-    """Send the question + context to Groq LLM and return the answer."""
+    """
+    Send the user's question and gathered context to the Groq LLM.
+    
+    This function initializes the ChatGroq model using the configured settings,
+    constructs a prompt using the predefined SYSTEM_PROMPT, and invokes the 
+    LLM chain to get a technical response based on the repository context.
+    """
     llm = ChatGroq(
         model=settings.llm_model,
         temperature=0,
