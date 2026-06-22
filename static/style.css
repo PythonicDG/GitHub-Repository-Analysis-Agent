@@ -165,6 +165,12 @@ body {
     overflow: hidden;
 }
 
+.sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 .footer-btn {
     width: 100%;
     padding: 12px;
