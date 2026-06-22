@@ -105,9 +105,9 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay" class="overlay">
+    <div id="loading-overlay" class="overlay" role="status" aria-live="polite" aria-busy="true">
         <div class="loader-content">
-            <div class="spinner"></div>
+            <div class="spinner" aria-hidden="true"></div>
             <p id="loading-text">Analyzing repository architecture...</p>
             <span class="sub-text">Fetching file tree and key metadata</span>
         </div>
