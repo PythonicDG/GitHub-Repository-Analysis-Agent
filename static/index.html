@@ -16,17 +16,17 @@
 <body class="dark-theme">
     <div class="app-container">
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" aria-label="Application sidebar">
             <div class="logo">
                 <i class="fab fa-github"></i>
                 <span>GitAnalyzer<span class="ai-tag">AI</span></span>
             </div>
             
-            <nav class="nav-menu">
-                <button class="nav-item active" data-view="chat-view">
+            <nav class="nav-menu" aria-label="Primary navigation">
+                <button class="nav-item active" data-view="chat-view" type="button" aria-current="page">
                     <i class="fas fa-comment-dots"></i> <span>Chat</span>
                 </button>
-                <button class="nav-item" data-view="add-repo-view">
+                <button class="nav-item" data-view="add-repo-view" type="button">
                     <i class="fas fa-plus-circle"></i> <span>Add Repo</span>
                 </button>
             </nav>
