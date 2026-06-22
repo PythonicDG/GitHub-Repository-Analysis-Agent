@@ -60,6 +60,11 @@ body {
     overflow: hidden;
 }
 
+:where(button, input, textarea):focus-visible {
+    outline: 3px solid var(--accent-secondary);
+    outline-offset: 3px;
+}
+
 .app-container {
     display: flex;
     height: 100vh;
