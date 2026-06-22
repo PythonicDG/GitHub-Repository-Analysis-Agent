@@ -538,6 +538,61 @@ body {
     padding: 0;
 }
 
+@media (max-width: 760px) {
+    .sidebar {
+        width: 84px;
+        padding: 20px 12px;
+    }
+
+    .logo,
+    .nav-item,
+    .footer-btn {
+        justify-content: center;
+    }
+
+    .logo > span,
+    .nav-item span,
+    .footer-btn span,
+    .repo-history {
+        display: none;
+    }
+
+    .main-content {
+        min-width: 0;
+    }
+
+    .top-bar {
+        padding: 0 16px;
+    }
+
+    .repo-stats {
+        gap: 10px;
+    }
+
+    .messages-container {
+        padding: 20px 16px 110px;
+    }
+
+    .message {
+        max-width: 95%;
+    }
+
+    .input-area {
+        right: 16px;
+        bottom: 20px;
+        left: 16px;
+    }
+
+    .view {
+        padding: 20px 16px;
+    }
+
+    .form-card {
+        margin: 20px auto;
+        padding: 24px;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
