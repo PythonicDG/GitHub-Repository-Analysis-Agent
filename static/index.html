@@ -55,9 +55,9 @@
                 <div class="view-title">
                     <h2 id="current-view-title">Chat Analysis</h2>
                 </div>
-                <div class="repo-stats" id="top-repo-stats" style="display: none;">
-                    <span class="stat"><i class="fas fa-star"></i> <span id="stat-stars">0</span></span>
-                    <span class="stat"><i class="fas fa-code-branch"></i> <span id="stat-forks">0</span></span>
+                <div class="repo-stats" id="top-repo-stats" aria-label="Repository statistics" aria-live="polite" style="display: none;">
+                    <span class="stat" title="Stars"><i class="fas fa-star" aria-hidden="true"></i> <span id="stat-stars">0</span><span class="sr-only"> stars</span></span>
+                    <span class="stat" title="Forks"><i class="fas fa-code-branch" aria-hidden="true"></i> <span id="stat-forks">0</span><span class="sr-only"> forks</span></span>
                     <span class="language-pill" id="stat-lang">Python</span>
                 </div>
             </header>
